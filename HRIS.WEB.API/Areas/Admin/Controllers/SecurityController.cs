@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
-namespace HRIS.WEB.API.Areas
+namespace HRIS.WEB.API.Areas.Admin.Controllers
 {
     [Area("Accounts")]
     [Route("api/[Area]/[controller]")]
@@ -124,6 +124,22 @@ namespace HRIS.WEB.API.Areas
                 return Unauthorized(jsonData);
             }
         }
+
+        [HttpGet("get_individual_employee")]
+        public async Task<IActionResult>IndividualEmployee(int EmployeeId)
+        {
+            long employeeId = Convert.ToInt64(EmployeeId);
+            var result = await _userProfile.getuserProfile(employeeId);
+            var jsonData = new
+            {
+                code = "200",
+                message = "Data Redrived Successfully",
+                data =result
+            };
+            return Ok(jsonData);
+        }
+
+
 
         [HttpPost("logout")]
         public IActionResult LogOut()

@@ -7,7 +7,7 @@ namespace HRIS.WEB.API.Middleware
         private readonly RequestDelegate _next;
         private static readonly string[] _excludedPaths = new[]
                {
-                   "/api/security/security/auth-user"
+                   "/api/accounts/security/auth-user"
                 };
 
         public AcceptJsonMiddleware(RequestDelegate next)
