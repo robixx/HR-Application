@@ -38,7 +38,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "http://192.168.11.153")
+            policy.WithOrigins(
+                "http://localhost:5173",    // Vite dev server
+                "http://192.168.0.102:5173" // optional if accessing via LAN IP
+            )
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials()
