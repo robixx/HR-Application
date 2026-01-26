@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using StackExchange.Redis;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,6 +13,14 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddDbContext<IhelpDbLiveContext>
     (options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+var redisConnection = builder.Configuration["Redis:Connection"];
+
+// Register Redis as a singleton
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+{
+    return ConnectionMultiplexer.Connect(redisConnection);
+});
+
 builder.Services.AddControllers();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

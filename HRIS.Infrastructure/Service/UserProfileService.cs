@@ -4,11 +4,14 @@ using HRIS.Domain.Entity;
 using HRIS.Infrastructure.Data;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
+using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace HRIS.Infrastructure.Service
@@ -16,9 +19,11 @@ namespace HRIS.Infrastructure.Service
     public class UserProfileService : IUserProfile
     {
         private readonly IhelpDbLiveContext _context;
-        public UserProfileService(IhelpDbLiveContext context)
+        private readonly IConnectionMultiplexer _cache;
+        public UserProfileService(IhelpDbLiveContext context, IConnectionMultiplexer cache)
         {
             _context = context;
+            _cache = cache;
         }
 
         public async Task<List<AttendanceLogDto>> getIndividualAttendance(string startdate, string enddate, long EmployeeId)
@@ -347,6 +352,62 @@ namespace HRIS.Infrastructure.Service
 
             }
             catch (Exception ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public async Task<List<AttendanceLogDto>> getAttendance(string startdate, string enddate)
+        {
+            try
+            {
+                string cacheKey = $"attendance_{startdate}_{enddate}";
+                var db = _cache.GetDatabase(); // Get Redis database
+
+                // 1️⃣ Try to get data from Redis
+                var cachedData = await db.StringGetAsync(cacheKey);
+                if (cachedData.HasValue)
+                {
+                    return JsonSerializer.Deserialize<List<AttendanceLogDto>>(cachedData!)!;
+                }
+
+                // 2️⃣ Parse dates
+                if (!DateTime.TryParse(startdate, out var start))
+                    throw new ArgumentException("Invalid start date", nameof(startdate));
+                if (!DateTime.TryParse(enddate, out var end))
+                    throw new ArgumentException("Invalid end date", nameof(enddate));
+
+                // 3️⃣ Fetch from database
+                var attendanceList = await _context.app_hris_attendance
+                    .Where(a => a.attnDate >= start && a.attnDate <= end)
+                    .Select(a => new AttendanceLogDto
+                    {
+                        EmployeeId = a.employeeId ?? 0,
+                        AttnDate = a.attnDate ?? DateTime.MinValue,
+                        AttnId = a.attnId,
+                        EmployeeCode = a.employeeCode ?? "",
+                        BioUserId = a.bioUserId ?? 0,
+                        BioUserName = a.bioUserName ?? "",
+                        InTime = a.inTime,
+                        OutTime = a.outTime,
+                        WorkTime = a.workTime,
+                        LateInTime = a.lateInTime,
+                        EarlyOutTime = a.earlyOutTime,
+                        Status = a.status ?? 1,
+                        InsertDate = a.insertDate ?? DateTime.MinValue,
+                        InsertBy = a.insertBy ?? 1,
+                        UpdateDate = a.updateDate
+                    })
+                    .ToListAsync();
+
+                // 4️⃣ Store in Redis cache for 10 minutes
+                var serializedData = JsonSerializer.Serialize(attendanceList);
+                await db.StringSetAsync(cacheKey, serializedData, TimeSpan.FromMinutes(10));
+
+                return attendanceList;
+
+            }
+            catch(Exception ex)
             {
                 throw new Exception(ex.Message);
             }
